@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- phpunit.xml en la raíz del proyecto -->
+<phpunit colors="true" bootstrap="src/ServicioVenta.php">
+    <testsuites>
+        <testsuite name="unitarias">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
