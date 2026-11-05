@@ -3,14 +3,14 @@ declare(strict_types=1);
 
 final class ServicioVenta
 {
-    public static function validarNumeroItems(int $cantidad): bool
+    public static function validarNumeroItems(int $numeroItems): bool
     {
-        return $cantidad >= 1 && $cantidad <= 100;
+        return $numeroItems >= 1 && $numeroItems <= 100;
     }
 
-    public static function validarCantidad(int $cantidad): bool
+    public static function validarCantidad(mixed $cantidad): bool
     {
-        return $cantidad > 0;
+        return is_int($cantidad) && $cantidad > 0;
     }
 
     public static function parsearCantidad(mixed $cantidad): int
@@ -19,18 +19,18 @@ final class ServicioVenta
             throw new InvalidArgumentException('La cantidad debe ser un entero mayor que cero.');
         }
 
-        $valor = filter_var($cantidad, FILTER_VALIDATE_INT);
-        if ($valor === false) {
+        $cantidadEntera = filter_var($cantidad, FILTER_VALIDATE_INT);
+        if ($cantidadEntera === false) {
             throw new InvalidArgumentException(
                 'El producto o la cantidad ingresada no son válidos.'
             );
         }
 
-        if (!self::validarCantidad($valor)) {
+        if (!self::validarCantidad($cantidadEntera)) {
             throw new InvalidArgumentException('La cantidad debe ser un entero mayor que cero.');
         }
 
-        return $valor;
+        return $cantidadEntera;
     }
 
     /**
@@ -42,7 +42,7 @@ final class ServicioVenta
             throw new InvalidArgumentException('La venta debe tener entre 1 y 100 productos.');
         }
 
-        $cantidades = [];
+        $unidadesPorProducto = [];
         foreach ($items as $item) {
             if (
                 !isset($item['producto_id'], $item['cantidad'])
@@ -54,12 +54,13 @@ final class ServicioVenta
                 throw new InvalidArgumentException('Los productos de la venta no son válidos.');
             }
 
-            $cantidades[$item['producto_id']] = ($cantidades[$item['producto_id']] ?? 0)
+            $unidadesPorProducto[$item['producto_id']] =
+                ($unidadesPorProducto[$item['producto_id']] ?? 0)
                 + $item['cantidad'];
         }
 
-        ksort($cantidades, SORT_NUMERIC);
-        return $cantidades;
+        ksort($unidadesPorProducto, SORT_NUMERIC);
+        return $unidadesPorProducto;
     }
 
     public static function hayStock(int $cantidad, int $stock): bool
@@ -72,7 +73,7 @@ final class ServicioVenta
      */
     public static function calcularSubtotal(array $items): float
     {
-        $subtotalCentimos = 0;
+        $subtotalEnCentimos = 0;
 
         foreach ($items as $item) {
             if (
@@ -84,11 +85,13 @@ final class ServicioVenta
                 throw new InvalidArgumentException('Los productos de la venta no son válidos.');
             }
 
-            $precioCentimos = self::aCentimos((float) $item['precio_unitario']);
-            $subtotalCentimos += $precioCentimos * $item['cantidad'];
+            $precioEnCentimos = self::convertirMontoACentimos(
+                (float) $item['precio_unitario']
+            );
+            $subtotalEnCentimos += $precioEnCentimos * $item['cantidad'];
         }
 
-        return $subtotalCentimos / 100;
+        return $subtotalEnCentimos / 100;
     }
 
     public static function calcularResumen(array $items): array
@@ -104,29 +107,27 @@ final class ServicioVenta
 
     public static function calcularDescuento(float $subtotal): float
     {
-        $subtotalCentimos = self::aCentimos($subtotal);
-
-        if ($subtotalCentimos <= 10000) {
-            return 0.0;
-        }
-
-        $totalCentimos = intdiv($subtotalCentimos * 190 + 100, 200);
-        return ($subtotalCentimos - $totalCentimos) / 100;
+        $subtotalEnCentimos = self::convertirMontoACentimos($subtotal);
+        $totalEnCentimos = self::calcularTotalEnCentimos($subtotalEnCentimos);
+        return ($subtotalEnCentimos - $totalEnCentimos) / 100;
     }
 
     public static function calcularTotal(float $subtotal): float
     {
-        $subtotalCentimos = self::aCentimos($subtotal);
-
-        if ($subtotalCentimos <= 10000) {
-            return $subtotalCentimos / 100;
-        }
-
-        $totalCentimos = intdiv($subtotalCentimos * 190 + 100, 200);
-        return $totalCentimos / 100;
+        $subtotalEnCentimos = self::convertirMontoACentimos($subtotal);
+        return self::calcularTotalEnCentimos($subtotalEnCentimos) / 100;
     }
 
-    private static function aCentimos(float $monto): int
+    private static function calcularTotalEnCentimos(int $subtotalEnCentimos): int
+    {
+        if ($subtotalEnCentimos <= 10000) {
+            return $subtotalEnCentimos;
+        }
+
+        return intdiv($subtotalEnCentimos * 190 + 100, 200);
+    }
+
+    private static function convertirMontoACentimos(float $monto): int
     {
         if (!is_finite($monto) || $monto < 0) {
             throw new InvalidArgumentException('El monto debe ser un número no negativo.');
